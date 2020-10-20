@@ -7,29 +7,39 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
-	"github.com/flsusp/m2mams-signer-go/m2mams/kprovider"
+	privatekp "github.com/flsusp/m2mams-signer-go/m2mams/kprovider"
 	"github.com/flsusp/m2mams-signer-go/m2mams/signer"
+	publickp "github.com/flsusp/m2mams-verifier-go/m2mams/kprovider"
+	"github.com/flsusp/m2mams-verifier-go/m2mams/verifier"
 	"github.com/urfave/cli/v2"
 	"os"
 	"os/user"
 )
 
 func main() {
-	var keyProvider string
+	var keyProviderFlag string
+	var contextFlag string
 
 	usr, err := user.Current()
 	panicOnError(err)
 
-	app := &cli.App{
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "kprovider",
-				Aliases:     []string{"kp"},
-				Value:       "file",
-				Usage:       "from where retrieve the signing keys (file | env)",
-				Destination: &keyProvider,
-			},
+	flags := []cli.Flag{
+		&cli.StringFlag{
+			Name:        "kprovider",
+			Aliases:     []string{"kp"},
+			Value:       "file",
+			Usage:       "from where retrieve the signing keys (file | env)",
+			Destination: &keyProviderFlag,
 		},
+		&cli.StringFlag{
+			Name:        "context",
+			Aliases:     []string{"ctx"},
+			Usage:       "context information which meaning depends on the chosen kprovider",
+			Destination: &contextFlag,
+		},
+	}
+
+	app := &cli.App{
 		Commands: []*cli.Command{
 			{
 				Name:      "generate",
@@ -44,14 +54,15 @@ func main() {
 					"   These files are generated as described by https://github.com/flsusp/m2mams.\n\n" +
 					"   The default values for <context> and <key pair> are `m2mams` and `id_rsa`, respectively. The value for " +
 					"<uid> is used to identify the user at the verifier / server side and usually it is an email address.",
+				Flags: flags,
 				Action: func(c *cli.Context) error {
 					uid := c.Args().Get(0)
 					if uid == "" {
 						panic(fmt.Errorf("<uid> is required"))
 					}
 
-					context := coalesce(c.Args().Get(1), "m2mams")
-					keyPair := coalesce(c.Args().Get(2), "id_rsa")
+					context := coalesce([]string{c.Args().Get(1), contextFlag, "m2mams"})
+					keyPair := coalesce([]string{c.Args().Get(2), "id_rsa"})
 
 					dir := fmt.Sprintf("%s/.%s/%s", usr.HomeDir, context, uid)
 					os.MkdirAll(dir, 0700)
@@ -84,20 +95,21 @@ func main() {
 					"`$HOME/.<context>/<uid>/<key pair>`. This file can be generated as described by https://github.com/flsusp/m2mams.\n\n" +
 					"   If the `--kprovider env` we expect to have an environment variables named `<context>_<key pair>_PK` " +
 					"(all uppercase letters) with the private key to be used in the PEM format.",
+				Flags: flags,
 				Action: func(c *cli.Context) error {
 					uid := c.Args().Get(0)
 					if uid == "" {
 						panic(fmt.Errorf("<uid> is required"))
 					}
 
-					context := coalesce(c.Args().Get(1), "m2mams")
-					keyPair := coalesce(c.Args().Get(2), "id_rsa")
+					context := coalesce([]string{c.Args().Get(1), contextFlag, "m2mams"})
+					keyPair := coalesce([]string{c.Args().Get(2), "id_rsa"})
 
-					var kp kprovider.KeyProvider
-					if keyProvider == "file" {
-						kp = kprovider.NewLocalFileSystemKProvider()
-					} else if keyProvider == "env" {
-						kp = kprovider.NewEnvironmentVariableKProvider()
+					var kp privatekp.KeyProvider
+					if keyProviderFlag == "file" {
+						kp = privatekp.NewLocalFileSystemKProvider()
+					} else if keyProviderFlag == "env" {
+						kp = privatekp.NewEnvironmentVariableKProvider()
 					} else {
 						return cli.Exit("Invalid --kprovider value", 1)
 					}
@@ -117,6 +129,46 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:      "verify",
+				Aliases:   []string{"v"},
+				Usage:     "verifies a signed JWT token",
+				UsageText: "m2mams verify [--kprovider file|env] <token>",
+				Description: "Verifies a JWT signed token getting the keys from the given `--kprovider`.\n\n" +
+					"   If the `--kprovider file` is defined we expect the `--context context` to indicate the path from where " +
+					"the public keys are going to be loaded.\n\n" +
+					"   If the `--kprovider git` is defined we expect the `--context context` to indicate the git url of the " +
+					"repository from where the public keys are going to be loaded. To authenticate on the git repository we " +
+					"rely on SSH authentication.\n\n" +
+					"   For generating key pairs please check the docs at https://github.com/flsusp/m2mams.",
+				Flags: flags,
+				Action: func(c *cli.Context) error {
+					tk := c.Args().Get(0)
+					if tk == "" {
+						panic(fmt.Errorf("<token> is required"))
+					}
+
+					context := coalesce([]string{c.Args().Get(1), contextFlag, "m2mams"})
+
+					dir := fmt.Sprintf("%s/.%s", usr.HomeDir, context)
+
+					var kp publickp.KeyProvider
+					if keyProviderFlag == "file" {
+						kp = publickp.NewLocalFileSystemKProvider(dir)
+					} else {
+						return cli.Exit("Invalid --kprovider value", 1)
+					}
+
+					v := verifier.Verifier{
+						KeyProvider: kp,
+					}
+
+					err := v.VerifySignedToken(tk)
+					panicOnError(err)
+
+					return nil
+				},
+			},
 		},
 		Name:    "M2MAMS CLI",
 		Usage:   "CLI that can be used to generate key pairs, generate signed JWT tokens or verify the generated tokens",
@@ -127,11 +179,13 @@ func main() {
 	panicOnError(err)
 }
 
-func coalesce(first string, second string) string {
-	if first != "" {
-		return first
+func coalesce(values []string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
 	}
-	return second
+	return ""
 }
 
 func panicOnError(err error) {

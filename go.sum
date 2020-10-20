@@ -7,6 +7,8 @@ github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumC
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/flsusp/m2mams-signer-go v0.0.1 h1:E6paJC3Pr80DnxzxmarLUsVO9fFDjOAUETCUntbwjbk=
 github.com/flsusp/m2mams-signer-go v0.0.1/go.mod h1:7RUsFcaVSjl1vbGyjBJhjQI+33wsljQJN38Y/zJE+qU=
+github.com/flsusp/m2mams-verifier-go v0.0.1 h1:KYFSmglGbV7RJGtuR6rrvK1RSWOxMXqXW8m77Q0S+HY=
+github.com/flsusp/m2mams-verifier-go v0.0.1/go.mod h1:XE2wFdwbP2uWC2nKd36K6FaPlgaawHQwsxFEL2AlscA=
 github.com/kr/fs v0.1.0/go.mod h1:FFnZGqtBN9Gxj7eW1uZ42v5BccTP0vu6NEaFoC2HwRg=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/sftp v1.10.1/go.mod h1:lYOWFsE0bwd1+KfKJaKeuokY15vzFx25BLbzYYoAxZI=
