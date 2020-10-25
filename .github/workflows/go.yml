@@ -34,3 +34,8 @@ jobs:
 
     - name: Sign and Verify Token
       run: go run m2mams.go v $(go run m2mams.go s test@test.com)
+
+    - name: Go Release Binary
+      # You may pin to the exact commit or the version.
+      # uses: ngs/go-release.action@a32a23d081d503245410d9d7bf59b722b50cc766
+      uses: ngs/go-release.action@v1.0.2
