@@ -163,8 +163,10 @@ func main() {
 						KeyProvider: kp,
 					}
 
-					err := v.VerifySignedToken(tk)
+					result, err := v.VerifySignedToken(tk)
 					panicOnError(err)
+
+					fmt.Println(result.Uid)
 
 					return nil
 				},
